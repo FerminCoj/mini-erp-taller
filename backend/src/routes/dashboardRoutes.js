@@ -8,6 +8,8 @@ const {
   obtenerAtrasosDashboard,
   obtenerRepuestosDashboard,
   obtenerReprocesosDashboard,
+  obtenerEntregasSemanales,
+  obtenerEntregasMensuales,
 } = require("../controllers/dashboardController");
 
 router.get("/resumen", obtenerResumenDashboard);
@@ -16,5 +18,7 @@ router.get("/detalle-estados", obtenerDetalleEstadosDashboard);
 router.get("/atrasos", obtenerAtrasosDashboard);
 router.get("/repuestos", obtenerRepuestosDashboard);
 router.get("/reprocesos", obtenerReprocesosDashboard);
+router.get("/entregas-semanales", obtenerEntregasSemanales);
+router.get("/entregas-mensuales", obtenerEntregasMensuales);
 
 module.exports = router;

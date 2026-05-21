@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./EntregasPage.css";
 
@@ -46,6 +46,10 @@ function EntregasPage() {
     cargarDatos();
   }, []);
 
+  const ordenesListasParaEntrega = useMemo(() => {
+    return ordenes.filter((orden) => orden.estado_actual === "Listo para entrega");
+  }, [ordenes]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
@@ -80,6 +84,7 @@ function EntregasPage() {
       });
 
       await obtenerEntregas();
+      await obtenerOrdenes();
     } catch (err) {
       console.error("Error al crear entrega:", err);
       setError(err.response?.data?.mensaje || "Error al registrar entrega");
@@ -105,8 +110,8 @@ function EntregasPage() {
               value={formData.id_orden}
               onChange={handleChange}
             >
-              <option value="">Seleccione una orden</option>
-              {ordenes.map((orden) => (
+              <option value="">Seleccione una orden lista para entrega</option>
+              {ordenesListasParaEntrega.map((orden) => (
                 <option key={orden.id_orden} value={orden.id_orden}>
                   {orden.numero_orden} - {orden.placa} - {orden.marca} {orden.modelo}
                 </option>
@@ -175,6 +180,13 @@ function EntregasPage() {
 
         {mensaje && <p className="success">{mensaje}</p>}
         {error && <p className="error">{error}</p>}
+
+        {ordenesListasParaEntrega.length === 0 && (
+          <p className="info-text">
+            No hay órdenes disponibles para entrega. El vehículo debe estar en
+            estado <strong> Listo para entrega </strong> antes de registrarse.
+          </p>
+        )}
       </div>
 
       <div className="section">
@@ -199,8 +211,12 @@ function EntregasPage() {
                   <tr key={entrega.id_entrega}>
                     <td>{entrega.id_entrega}</td>
                     <td>{entrega.numero_orden}</td>
-                    <td>{entrega.nombres} {entrega.apellidos}</td>
-                    <td>{entrega.placa} - {entrega.marca} {entrega.modelo}</td>
+                    <td>
+                      {entrega.nombres} {entrega.apellidos}
+                    </td>
+                    <td>
+                      {entrega.placa} - {entrega.marca} {entrega.modelo}
+                    </td>
                     <td>{entrega.fecha_entrega}</td>
                     <td>{entrega.hora_entrega}</td>
                     <td>{entrega.recibido_por_cliente}</td>

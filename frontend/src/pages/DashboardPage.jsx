@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import "./DashboardPage.css";
 
 function DashboardPage() {
@@ -9,12 +18,33 @@ function DashboardPage() {
   const [atrasos, setAtrasos] = useState([]);
   const [repuestos, setRepuestos] = useState([]);
   const [reprocesos, setReprocesos] = useState([]);
+  const [entregasSemanales, setEntregasSemanales] = useState([]);
+  const [entregasMensuales, setEntregasMensuales] = useState([]);
   const [vistaActiva, setVistaActiva] = useState("detalle");
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const detalleRef = useRef(null);
   const reprocesosRef = useRef(null);
+  const resumenEntregasRef = useRef(null);
+  const atrasosRef = useRef(null);
+  const repuestosRef = useRef(null);
+
+  const nombresMeses = {
+    1: "Ene",
+    2: "Feb",
+    3: "Mar",
+    4: "Abr",
+    5: "May",
+    6: "Jun",
+    7: "Jul",
+    8: "Ago",
+    9: "Sep",
+    10: "Oct",
+    11: "Nov",
+    12: "Dic",
+  };
 
   const formatearFechaHora = (fecha) => {
     if (!fecha) return "Sin fecha";
@@ -54,6 +84,8 @@ function DashboardPage() {
           atrasosRes,
           repuestosRes,
           reprocesosRes,
+          semanalesRes,
+          mensualesRes,
         ] = await Promise.all([
           axios.get("http://localhost:4000/dashboard/resumen"),
           axios.get("http://localhost:4000/dashboard/estados"),
@@ -61,6 +93,8 @@ function DashboardPage() {
           axios.get("http://localhost:4000/dashboard/atrasos"),
           axios.get("http://localhost:4000/dashboard/repuestos"),
           axios.get("http://localhost:4000/dashboard/reprocesos"),
+          axios.get("http://localhost:4000/dashboard/entregas-semanales"),
+          axios.get("http://localhost:4000/dashboard/entregas-mensuales"),
         ]);
 
         setResumen(resumenRes.data);
@@ -69,6 +103,8 @@ function DashboardPage() {
         setAtrasos(atrasosRes.data);
         setRepuestos(repuestosRes.data);
         setReprocesos(reprocesosRes.data);
+        setEntregasSemanales(semanalesRes.data);
+        setEntregasMensuales(mensualesRes.data);
       } catch (err) {
         console.error("Error al cargar dashboard:", err);
         setError("No se pudo cargar la información del dashboard");
@@ -83,18 +119,28 @@ function DashboardPage() {
   useEffect(() => {
     if (loading) return;
 
-    const destino =
-      vistaActiva === "reprocesos" ? reprocesosRef.current : detalleRef.current;
+    let destino = detalleRef.current;
+
+    if (vistaActiva === "reprocesos") destino = reprocesosRef.current;
+    if (vistaActiva === "resumen-entregas") destino = resumenEntregasRef.current;
+    if (vistaActiva === "atrasados") destino = atrasosRef.current;
+    if (vistaActiva === "repuestos") destino = repuestosRef.current;
 
     if (destino) {
       setTimeout(() => {
         destino.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     }
-  }, [vistaActiva, loading]);
+  }, [vistaActiva, estadoSeleccionado, loading]);
 
   const cambiarVista = (vista) => {
     setVistaActiva(vista);
+    setEstadoSeleccionado("");
+  };
+
+  const seleccionarEstado = (estado) => {
+    setVistaActiva("estado-especifico");
+    setEstadoSeleccionado(estado);
   };
 
   const vehiculosEnProceso = useMemo(() => {
@@ -129,20 +175,15 @@ function DashboardPage() {
             item.situacion_tiempo === "Finalizado"
         );
 
-      case "repuestos":
-        return detalleEstados.filter((item) =>
-          repuestos.some((rep) => rep.numero_orden === item.numero_orden)
-        );
-
-      case "atrasados":
+      case "estado-especifico":
         return detalleEstados.filter(
-          (item) => item.situacion_tiempo === "Atrasado"
+          (item) => item.estado_actual === estadoSeleccionado
         );
 
       default:
         return detalleEstados;
     }
-  }, [vistaActiva, detalleEstados, repuestos]);
+  }, [vistaActiva, detalleEstados, estadoSeleccionado]);
 
   const tituloTablaPrincipal = useMemo(() => {
     switch (vistaActiva) {
@@ -154,14 +195,19 @@ function DashboardPage() {
         return "Vehículos listos para entrega";
       case "entregados":
         return "Vehículos entregados";
-      case "repuestos":
-        return "Vehículos con repuestos pendientes";
-      case "atrasados":
-        return "Vehículos atrasados";
+      case "estado-especifico":
+        return `Detalle de vehículos - ${estadoSeleccionado}`;
       default:
         return "Detalle operativo por vehículo";
     }
-  }, [vistaActiva]);
+  }, [vistaActiva, estadoSeleccionado]);
+
+  const datosMensualesGrafica = useMemo(() => {
+    return entregasMensuales.map((item) => ({
+      mes: nombresMeses[item.mes] || `Mes ${item.mes}`,
+      entregas: Number(item.total_entregas),
+    }));
+  }, [entregasMensuales]);
 
   if (loading) {
     return <div className="loading">Cargando dashboard...</div>;
@@ -194,14 +240,14 @@ function DashboardPage() {
           <p>{resumen?.listas_para_entrega}</p>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("repuestos")}>
-          <h3>Pendientes repuestos</h3>
-          <p>{resumen?.pendientes_repuestos}</p>
-        </button>
-
         <button className="card card-button" onClick={() => cambiarVista("entregados")}>
           <h3>Vehículos entregados</h3>
           <p>{resumen?.total_entregados}</p>
+        </button>
+
+        <button className="card card-button" onClick={() => cambiarVista("repuestos")}>
+          <h3>Pendientes repuestos</h3>
+          <p>{resumen?.pendientes_repuestos}</p>
         </button>
 
         <button className="card card-button" onClick={() => cambiarVista("atrasados")}>
@@ -213,6 +259,14 @@ function DashboardPage() {
           <h3>Total reprocesos</h3>
           <p>{resumen?.total_reprocesos}</p>
         </button>
+
+        <button
+          className="card card-button"
+          onClick={() => cambiarVista("resumen-entregas")}
+        >
+          <h3>Resumen de Entregas</h3>
+          <p>{resumen?.total_entregados}</p>
+        </button>
       </div>
 
       <div className="section">
@@ -220,10 +274,15 @@ function DashboardPage() {
         <div className="states-grid">
           {estados.length > 0 ? (
             estados.map((item, index) => (
-              <div key={index} className="state-card">
+              <button
+                key={index}
+                className="state-card state-button"
+                onClick={() => seleccionarEstado(item.estado_actual)}
+                type="button"
+              >
                 <span className="state-label">{item.estado_actual}</span>
                 <span className="state-value">{item.total_vehiculos}</span>
-              </div>
+              </button>
             ))
           ) : (
             <div className="empty-box">No hay estados registrados.</div>
@@ -231,7 +290,59 @@ function DashboardPage() {
         </div>
       </div>
 
-      {vistaActiva !== "reprocesos" && (
+      {vistaActiva === "resumen-entregas" && (
+        <div className="section" ref={resumenEntregasRef}>
+          <h3 className="section-title">Resumen de entregas</h3>
+          <div className="delivery-summary-grid">
+            <div className="chart-card">
+              <h4>Entregas mensuales</h4>
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={datosMensualesGrafica}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="entregas" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="table-card">
+              <h4>Entregas semanales</h4>
+              <div className="table-container small-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Semana</th>
+                      <th>Total entregas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entregasSemanales.length > 0 ? (
+                      entregasSemanales.map((item, index) => (
+                        <tr key={index}>
+                          <td>Semana {item.semana}</td>
+                          <td>{item.total_entregas}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="2">No hay entregas registradas.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {["detalle", "proceso", "listas", "entregados", "estado-especifico"].includes(
+        vistaActiva
+      ) && (
         <div className="section" ref={detalleRef}>
           <h3 className="section-title">{tituloTablaPrincipal}</h3>
           <div className="table-container">
@@ -319,71 +430,75 @@ function DashboardPage() {
         </div>
       )}
 
-      <div className="section">
-        <h3 className="section-title">Órdenes con atrasos</h3>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>No. Orden</th>
-                <th>Estado proceso</th>
-                <th>Fecha inicio</th>
-                <th>Fecha límite</th>
-                <th>Motivo atraso</th>
-              </tr>
-            </thead>
-            <tbody>
-              {atrasos.length > 0 ? (
-                atrasos.map((item, index) => (
-                  <tr key={index}>
-                    <td>{item.numero_orden}</td>
-                    <td>{item.estado_proceso}</td>
-                    <td>{formatearFechaHora(item.fecha_inicio)}</td>
-                    <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
-                    <td>{item.motivo_atraso || "Sin motivo registrado"}</td>
-                  </tr>
-                ))
-              ) : (
+      {vistaActiva === "atrasados" && (
+        <div className="section" ref={atrasosRef}>
+          <h3 className="section-title">Órdenes con atrasos</h3>
+          <div className="table-container">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan="5">No hay órdenes con atraso actualmente.</td>
+                  <th>No. Orden</th>
+                  <th>Estado proceso</th>
+                  <th>Fecha inicio</th>
+                  <th>Fecha límite</th>
+                  <th>Motivo atraso</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {atrasos.length > 0 ? (
+                  atrasos.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.numero_orden}</td>
+                      <td>{item.estado_proceso}</td>
+                      <td>{formatearFechaHora(item.fecha_inicio)}</td>
+                      <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
+                      <td>{item.motivo_atraso || "Sin motivo registrado"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5">No hay órdenes con atraso actualmente.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="section">
-        <h3 className="section-title">Repuestos pendientes</h3>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>No. Orden</th>
-                <th>Técnico asignado</th>
-                <th>Estado actual</th>
-                <th>Observación repuestos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {repuestos.length > 0 ? (
-                repuestos.map((item, index) => (
-                  <tr key={index}>
-                    <td>{item.numero_orden}</td>
-                    <td>{item.tecnico_asignado}</td>
-                    <td>{item.estado_actual}</td>
-                    <td>{item.observacion_repuestos || "Sin observación"}</td>
-                  </tr>
-                ))
-              ) : (
+      {vistaActiva === "repuestos" && (
+        <div className="section" ref={repuestosRef}>
+          <h3 className="section-title">Repuestos pendientes</h3>
+          <div className="table-container">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan="4">No hay repuestos pendientes actualmente.</td>
+                  <th>No. Orden</th>
+                  <th>Técnico asignado</th>
+                  <th>Estado actual</th>
+                  <th>Observación repuestos</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {repuestos.length > 0 ? (
+                  repuestos.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.numero_orden}</td>
+                      <td>{item.tecnico_asignado}</td>
+                      <td>{item.estado_actual}</td>
+                      <td>{item.observacion_repuestos || "Sin observación"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4">No hay repuestos pendientes actualmente.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

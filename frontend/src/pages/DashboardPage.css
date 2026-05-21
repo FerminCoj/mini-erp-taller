@@ -47,7 +47,7 @@ body {
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
   border: 1px solid #e5e7eb;
   text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .card h3 {
@@ -67,11 +67,13 @@ body {
   cursor: pointer;
   border: 1px solid #e5e7eb;
   font-family: inherit;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 .card-button:hover {
   transform: translateY(-4px);
   box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+  border-color: #cbd5e1;
 }
 
 .card-button:active {
@@ -131,6 +133,46 @@ body {
   color: #64748b;
 }
 
+/* Resumen de entregas */
+.delivery-summary-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.chart-card,
+.table-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.chart-card h4,
+.table-card h4 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e3a5f;
+}
+
+.chart-wrapper {
+  width: 100%;
+  height: 320px;
+}
+
+.small-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.small-table th,
+.small-table td {
+  padding: 14px 16px;
+}
+
+/* Tablas generales */
 .table-container {
   background: #ffffff;
   border-radius: 18px;
@@ -166,6 +208,7 @@ tbody tr:hover {
   background-color: #eef6ff;
 }
 
+/* Badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -216,6 +259,12 @@ tbody tr:hover {
   color: #334155;
 }
 
+@media (max-width: 992px) {
+  .delivery-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 24px 14px 40px;
@@ -242,4 +291,35 @@ tbody tr:hover {
     padding: 12px 10px;
     font-size: 14px;
   }
+
+  .chart-wrapper {
+    height: 260px;
+  }
+}
+
+@media (max-width: 576px) {
+  .states-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.state-button {
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.state-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.12);
+  border-color: #cbd5e1;
+}
+
+.state-button:active {
+  transform: translateY(-1px);
 }

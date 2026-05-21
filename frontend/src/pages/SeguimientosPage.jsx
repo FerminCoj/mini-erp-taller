@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./SeguimientosPage.css";
 
@@ -7,7 +7,7 @@ function SeguimientosPage() {
   const [ordenes, setOrdenes] = useState([]);
   const [formData, setFormData] = useState({
     id_orden: "",
-    estado_proceso: "Recibido",
+    estado_proceso: "En enderezado",
     fecha_inicio: "",
     fecha_fin: "",
     observaciones: "",
@@ -60,6 +60,10 @@ function SeguimientosPage() {
     cargarDatos();
   }, []);
 
+  const ordenesDisponiblesSeguimiento = useMemo(() => {
+    return ordenes.filter((orden) => orden.estado_actual !== "Entregado");
+  }, [ordenes]);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -83,7 +87,7 @@ function SeguimientosPage() {
 
       setFormData({
         id_orden: "",
-        estado_proceso: "Recibido",
+        estado_proceso: "En enderezado",
         fecha_inicio: "",
         fecha_fin: "",
         observaciones: "",
@@ -93,6 +97,7 @@ function SeguimientosPage() {
       });
 
       await obtenerSeguimientos();
+      await obtenerOrdenes();
     } catch (err) {
       console.error("Error al crear seguimiento:", err);
       setError(err.response?.data?.mensaje || "Error al registrar seguimiento");
@@ -119,7 +124,7 @@ function SeguimientosPage() {
               onChange={handleChange}
             >
               <option value="">Seleccione una orden</option>
-              {ordenes.map((orden) => (
+              {ordenesDisponiblesSeguimiento.map((orden) => (
                 <option key={orden.id_orden} value={orden.id_orden}>
                   {orden.numero_orden} - {orden.placa} - {orden.marca} {orden.modelo}
                 </option>
@@ -135,7 +140,6 @@ function SeguimientosPage() {
               value={formData.estado_proceso}
               onChange={handleChange}
             >
-              <option value="Recibido">Recibido</option>
               <option value="En enderezado">En enderezado</option>
               <option value="En preparación">En preparación</option>
               <option value="En pintura">En pintura</option>
@@ -207,6 +211,13 @@ function SeguimientosPage() {
 
         {mensaje && <p className="success">{mensaje}</p>}
         {error && <p className="error">{error}</p>}
+
+        {ordenesDisponiblesSeguimiento.length === 0 && (
+          <p className="info-text">
+            No hay órdenes disponibles para seguimiento. Las órdenes entregadas ya
+            no se muestran en este módulo.
+          </p>
+        )}
       </div>
 
       <div className="section">
@@ -231,8 +242,12 @@ function SeguimientosPage() {
                   <tr key={seguimiento.id_seguimiento}>
                     <td>{seguimiento.id_seguimiento}</td>
                     <td>{seguimiento.numero_orden}</td>
-                    <td>{seguimiento.placa} - {seguimiento.marca} {seguimiento.modelo}</td>
-                    <td>{seguimiento.nombres} {seguimiento.apellidos}</td>
+                    <td>
+                      {seguimiento.placa} - {seguimiento.marca} {seguimiento.modelo}
+                    </td>
+                    <td>
+                      {seguimiento.nombres} {seguimiento.apellidos}
+                    </td>
                     <td>{seguimiento.estado_proceso}</td>
                     <td>{formatearFechaHora(seguimiento.fecha_inicio)}</td>
                     <td>{formatearFechaHora(seguimiento.fecha_limite_etapa)}</td>

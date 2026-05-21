@@ -72,8 +72,22 @@ const obtenerEstadosDashboard = async (req, res) => {
         estado_actual,
         COUNT(*) AS total_vehiculos
       FROM estado_actual_por_orden
+      WHERE estado_actual IN (
+        'En enderezado',
+        'En preparación',
+        'En pintura',
+        'En armado',
+        'En lavado'
+      )
       GROUP BY estado_actual
-      ORDER BY total_vehiculos DESC, estado_actual ASC
+      ORDER BY CASE estado_actual
+        WHEN 'En enderezado' THEN 1
+        WHEN 'En preparación' THEN 2
+        WHEN 'En pintura' THEN 3
+        WHEN 'En armado' THEN 4
+        WHEN 'En lavado' THEN 5
+        ELSE 99
+      END
     `);
 
     res.json(result.rows);
@@ -123,7 +137,7 @@ const obtenerDetalleEstadosDashboard = async (req, res) => {
       INNER JOIN vehiculos v ON rv.id_vehiculo = v.id_vehiculo
       INNER JOIN clientes c ON v.id_cliente = c.id_cliente
       LEFT JOIN ultimo_seguimiento us ON ot.id_orden = us.id_orden
-      ORDER BY estado_actual ASC, ot.numero_orden ASC
+      ORDER BY ot.numero_orden ASC
     `);
 
     res.json(result.rows);
@@ -216,6 +230,48 @@ const obtenerReprocesosDashboard = async (req, res) => {
   }
 };
 
+const obtenerEntregasSemanales = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        EXTRACT(WEEK FROM fecha_entrega) AS semana,
+        COUNT(*) AS total_entregas
+      FROM entregas
+      GROUP BY EXTRACT(WEEK FROM fecha_entrega)
+      ORDER BY semana ASC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener entregas semanales:", error);
+    res.status(500).json({
+      mensaje: "Error al obtener entregas semanales",
+      error: error.message,
+    });
+  }
+};
+
+const obtenerEntregasMensuales = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        EXTRACT(MONTH FROM fecha_entrega) AS mes,
+        COUNT(*) AS total_entregas
+      FROM entregas
+      GROUP BY EXTRACT(MONTH FROM fecha_entrega)
+      ORDER BY mes ASC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener entregas mensuales:", error);
+    res.status(500).json({
+      mensaje: "Error al obtener entregas mensuales",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   obtenerResumenDashboard,
   obtenerEstadosDashboard,
@@ -223,4 +279,6 @@ module.exports = {
   obtenerAtrasosDashboard,
   obtenerRepuestosDashboard,
   obtenerReprocesosDashboard,
+  obtenerEntregasSemanales,
+  obtenerEntregasMensuales,
 };

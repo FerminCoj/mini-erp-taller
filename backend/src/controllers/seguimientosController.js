@@ -30,6 +30,8 @@ const obtenerSeguimientos = async (req, res) => {
 };
 
 const crearSeguimiento = async (req, res) => {
+  const client = await pool.connect();
+
   try {
     const {
       id_orden,
@@ -42,14 +44,39 @@ const crearSeguimiento = async (req, res) => {
       motivo_atraso,
     } = req.body;
 
-    if (!id_orden || !estado_proceso || !fecha_inicio || !actualizado_por) {
+    if (!id_orden || !estado_proceso || !fecha_inicio) {
       return res.status(400).json({
         mensaje:
-          "Los campos id_orden, estado_proceso, fecha_inicio y actualizado_por son obligatorios",
+          "Los campos id_orden, estado_proceso y fecha_inicio son obligatorios",
       });
     }
 
-    const result = await pool.query(
+    if (estado_proceso === "Entregado") {
+      return res.status(400).json({
+        mensaje:
+          "El estado 'Entregado' no debe registrarse manualmente en seguimiento. Debe generarse automáticamente desde el módulo de entrega.",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const ordenExiste = await client.query(
+      `
+      SELECT id_orden, estado_actual
+      FROM ordenes_trabajo
+      WHERE id_orden = $1
+      `,
+      [Number(id_orden)]
+    );
+
+    if (ordenExiste.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        mensaje: "La orden indicada no existe",
+      });
+    }
+
+    const result = await client.query(
       `
       INSERT INTO seguimiento_reparacion (
         id_orden,
@@ -70,22 +97,36 @@ const crearSeguimiento = async (req, res) => {
         fecha_inicio,
         fecha_fin || null,
         observaciones || null,
-        Number(actualizado_por),
+        Number(actualizado_por || 1),
         fecha_limite_etapa || null,
         motivo_atraso || null,
       ]
     );
+
+    await client.query(
+      `
+      UPDATE ordenes_trabajo
+      SET estado_actual = $1
+      WHERE id_orden = $2
+      `,
+      [estado_proceso, Number(id_orden)]
+    );
+
+    await client.query("COMMIT");
 
     res.status(201).json({
       mensaje: "Seguimiento registrado correctamente",
       seguimiento: result.rows[0],
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error al crear seguimiento:", error);
     res.status(500).json({
-      mensaje: "Error al crear seguimiento",
+      mensaje: "Error al registrar seguimiento",
       error: error.message,
     });
+  } finally {
+    client.release();
   }
 };
 

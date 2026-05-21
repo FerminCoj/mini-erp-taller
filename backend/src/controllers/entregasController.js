@@ -52,6 +52,53 @@ const crearEntrega = async (req, res) => {
 
     await client.query("BEGIN");
 
+    const entregaExistente = await client.query(
+      `
+      SELECT id_entrega
+      FROM entregas
+      WHERE id_orden = $1
+      `,
+      [Number(id_orden)]
+    );
+
+    if (entregaExistente.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        mensaje: "La orden seleccionada ya tiene una entrega registrada",
+      });
+    }
+
+    const ultimoSeguimiento = await client.query(
+      `
+      SELECT
+        sr.id_seguimiento,
+        sr.estado_proceso
+      FROM seguimiento_reparacion sr
+      WHERE sr.id_orden = $1
+      ORDER BY sr.id_seguimiento DESC
+      LIMIT 1
+      `,
+      [Number(id_orden)]
+    );
+
+    if (ultimoSeguimiento.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        mensaje:
+          "No se puede registrar la entrega porque la orden no tiene seguimiento registrado",
+      });
+    }
+
+    const estadoActualSeguimiento = ultimoSeguimiento.rows[0].estado_proceso;
+
+    if (estadoActualSeguimiento !== "Listo para entrega") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        mensaje:
+          `No se puede registrar la entrega. El último estado del seguimiento es "${estadoActualSeguimiento}". Debe finalizar el proceso y dejarlo en "Listo para entrega".`,
+      });
+    }
+
     const entregaResult = await client.query(
       `
       INSERT INTO entregas (
@@ -86,7 +133,11 @@ const crearEntrega = async (req, res) => {
       [Number(id_orden)]
     );
 
-    const fechaHoraEntrega = `${fecha_entrega || new Date().toISOString().split("T")[0]}T${hora_entrega || new Date().toLocaleTimeString("en-GB")}`;
+    const fechaEntregaFinal =
+      fecha_entrega || new Date().toISOString().split("T")[0];
+    const horaEntregaFinal =
+      hora_entrega || new Date().toLocaleTimeString("en-GB");
+    const fechaHoraEntrega = `${fechaEntregaFinal}T${horaEntregaFinal}`;
 
     await client.query(
       `
@@ -122,13 +173,6 @@ const crearEntrega = async (req, res) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-
-    if (error.code === "23505") {
-      return res.status(400).json({
-        mensaje: "La orden seleccionada ya tiene una entrega registrada",
-      });
-    }
-
     console.error("Error al crear entrega:", error);
     res.status(500).json({
       mensaje: "Error al crear entrega",
