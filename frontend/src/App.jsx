@@ -6,15 +6,26 @@ import RecepcionesPage from "./pages/RecepcionesPage";
 import OrdenesPage from "./pages/OrdenesPage";
 import SeguimientosPage from "./pages/SeguimientosPage";
 import EntregasPage from "./pages/EntregasPage";
+import logoCAP from "./assets/CAP.png";
 import "./App.css";
 
 function App() {
   const [vistaActiva, setVistaActiva] = useState("dashboard");
 
   return (
-    <div>
+    <div className="app-container">
       <nav className="main-nav">
-        <div className="nav-brand">Enderezado y Pintura</div>
+        <div className="nav-brand">
+          <img
+            src={logoCAP}
+            alt="Logo Enderezado y Pintura"
+            className="nav-logo"
+          />
+
+          <div className="nav-brand-text">
+            <span className="nav-brand-title">Enderezado y Pintura</span>
+          </div>
+        </div>
 
         <div className="nav-buttons">
           <button
@@ -68,13 +79,15 @@ function App() {
         </div>
       </nav>
 
-      {vistaActiva === "dashboard" && <DashboardPage />}
-      {vistaActiva === "clientes" && <ClientesPage />}
-      {vistaActiva === "vehiculos" && <VehiculosPage />}
-      {vistaActiva === "recepciones" && <RecepcionesPage />}
-      {vistaActiva === "ordenes" && <OrdenesPage />}
-      {vistaActiva === "seguimientos" && <SeguimientosPage />}
-      {vistaActiva === "entregas" && <EntregasPage />}
+      <main className="main-content">
+        {vistaActiva === "dashboard" && <DashboardPage />}
+        {vistaActiva === "clientes" && <ClientesPage />}
+        {vistaActiva === "vehiculos" && <VehiculosPage />}
+        {vistaActiva === "recepciones" && <RecepcionesPage />}
+        {vistaActiva === "ordenes" && <OrdenesPage />}
+        {vistaActiva === "seguimientos" && <SeguimientosPage />}
+        {vistaActiva === "entregas" && <EntregasPage />}
+      </main>
     </div>
   );
 }

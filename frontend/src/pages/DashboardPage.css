@@ -1,31 +1,70 @@
 .container {
-  padding: 34px 14px 60px;
+  padding: 18px 14px 60px;
   background: #f1f5f9;
   min-height: 100vh;
 }
 
 .header {
+  margin-bottom: 16px;
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-radius: 24px;
+  padding: 16px 24px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+}
+
+.brand-logo-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: auto;
+  height: auto;
+}
+
+.brand-logo {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  margin-bottom: 30px;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 48px;
+  font-size: 42px;
   font-weight: 900;
   line-height: 1;
   color: #0f172a;
 }
 
 .header h2 {
-  margin: 8px 0 0;
-  font-size: 18px;
+  margin: 10px 0 0;
+  font-size: 16px;
   font-weight: 600;
   color: #475569;
+  text-align: center;
 }
 
 .section {
   margin-bottom: 34px;
+  scroll-margin-top: 110px;
 }
 
 .section-title {
@@ -519,6 +558,52 @@ tbody tr:hover {
   color: #475569;
 }
 
+.history-btn {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.15);
+}
+
+.history-section {
+  margin-top: 24px;
+}
+
+.history-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  margin-bottom: 18px;
+}
+
+.history-card p {
+  margin: 8px 0;
+  color: #334155;
+}
+
+.history-block {
+  margin-top: 18px;
+}
+
+.history-block h4 {
+  margin: 0 0 12px;
+  color: #1e3a5f;
+  font-size: 18px;
+  font-weight: 800;
+}
+
 @media (max-width: 1200px) {
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -538,21 +623,40 @@ tbody tr:hover {
   }
 
   .header h1 {
-    font-size: 40px;
+    font-size: 36px;
   }
 }
 
 @media (max-width: 768px) {
   .container {
-    padding: 24px 12px 40px;
+    padding: 16px 12px 40px;
+  }
+
+  .brand-header {
+    flex-direction: column;
+    text-align: center;
+    padding: 14px 16px;
+  }
+
+  .brand-text {
+    text-align: center;
+  }
+
+  .brand-logo {
+    width: 104px;
+    height: 104px;
+  }
+
+  .header {
+    margin-bottom: 14px;
   }
 
   .header h1 {
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .header h2 {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .cards,
@@ -615,65 +719,8 @@ tbody tr:hover {
   }
 }
 
-.history-btn {
-  background: #0f172a;
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
 
-.history-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.15);
-}
 
-.history-btn {
-  background: #0f172a;
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.history-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.15);
-}
-
-.history-section {
-  margin-top: 24px;
-}
-
-.history-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
-  margin-bottom: 18px;
-}
-
-.history-card p {
-  margin: 8px 0;
-  color: #334155;
-}
-
-.history-block {
-  margin-top: 18px;
-}
-
-.history-block h4 {
-  margin: 0 0 12px;
-  color: #1e3a5f;
-  font-size: 18px;
-  font-weight: 800;
+.delivery-kpis-grid {
+  scroll-margin-top: 110px;
 }

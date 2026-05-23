@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import logoCAP from "../assets/CAP.png";
 import "./DashboardPage.css";
 
 function DashboardPage() {
@@ -60,8 +61,8 @@ function DashboardPage() {
 
   const formatearFechaHora = (fecha) => {
     if (!fecha) return "Sin fecha";
-    const date = new Date(fecha);
 
+    const date = new Date(fecha);
     const anio = date.getFullYear();
     const mes = String(date.getMonth() + 1).padStart(2, "0");
     const dia = String(date.getDate()).padStart(2, "0");
@@ -121,6 +122,23 @@ function DashboardPage() {
     }
   };
 
+  const obtenerClaseEstado = (estadoActual) => {
+    switch (estadoActual) {
+      case "En enderezado":
+        return "state-enderezado";
+      case "En preparación":
+        return "state-preparacion";
+      case "En pintura":
+        return "state-pintura";
+      case "En armado":
+        return "state-armado";
+      case "En lavado":
+        return "state-lavado";
+      default:
+        return "state-default";
+    }
+  };
+
   const obtenerClaseAlerta = (nivel) => {
     switch (nivel) {
       case "critica":
@@ -145,6 +163,31 @@ function DashboardPage() {
       default:
         return "Alerta";
     }
+  };
+
+  const convertirImagenABase64 = (imagen) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        const dataURL = canvas.toDataURL("image/png");
+        resolve(dataURL);
+      };
+
+      img.onerror = (errorCarga) => {
+        reject(errorCarga);
+      };
+
+      img.src = imagen;
+    });
   };
 
   useEffect(() => {
@@ -343,25 +386,32 @@ function DashboardPage() {
     }));
   }, [entregasMensualesControl]);
 
-  const exportarResumenPDF = () => {
+  const exportarResumenPDF = async () => {
     const doc = new jsPDF("p", "mm", "a4");
     const fechaGeneracion = new Date();
 
+    try {
+      const logoBase64 = await convertirImagenABase64(logoCAP);
+      doc.addImage(logoBase64, "PNG", 14, 10, 24, 24);
+    } catch (err) {
+      console.error("No se pudo cargar el logo en el PDF:", err);
+    }
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text("Centro Automotriz Palín", 14, 18);
+    doc.setFontSize(18);
+    doc.text("Centro Automotriz Palín", 44, 18);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text("Resumen gerencial del dashboard", 14, 25);
+    doc.setFontSize(10);
+    doc.text("Resumen gerencial del dashboard", 44, 25);
     doc.text(
       `Fecha de generación: ${fechaGeneracion.toLocaleDateString()} ${fechaGeneracion.toLocaleTimeString()}`,
-      14,
+      44,
       31
     );
 
     autoTable(doc, {
-      startY: 38,
+      startY: 42,
       head: [["Indicador", "Valor"]],
       body: [
         ["Total de órdenes", resumen?.total_ordenes ?? 0],
@@ -395,11 +445,15 @@ function DashboardPage() {
       body: [
         [
           "Área con mayor carga",
-          `${indicadoresOperativos?.area_mayor_carga || "Sin datos"} (${indicadoresOperativos?.total_area_mayor_carga || 0})`,
+          `${indicadoresOperativos?.area_mayor_carga || "Sin datos"} (${
+            indicadoresOperativos?.total_area_mayor_carga || 0
+          })`,
         ],
         [
           "Área con más atrasos",
-          `${indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"} (${indicadoresOperativos?.total_area_mas_atrasada || 0})`,
+          `${indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"} (${
+            indicadoresOperativos?.total_area_mas_atrasada || 0
+          })`,
         ],
         [
           "Tiempo promedio de reparación",
@@ -407,7 +461,9 @@ function DashboardPage() {
         ],
         [
           "Técnico con mayor carga",
-          `${tecnicoMayorCarga?.tecnico_asignado || "Sin datos"} (${tecnicoMayorCarga?.total_ordenes_activas || 0})`,
+          `${tecnicoMayorCarga?.tecnico_asignado || "Sin datos"} (${
+            tecnicoMayorCarga?.total_ordenes_activas || 0
+          })`,
         ],
       ],
       headStyles: { fillColor: [51, 65, 85] },
@@ -456,8 +512,20 @@ function DashboardPage() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Centro Automotriz Palín</h1>
-        <h2>Calidad y precisión en cada reparación</h2>
+        <div className="brand-header">
+          <div className="brand-logo-box">
+            <img
+              src={logoCAP}
+              alt="Logo Centro Automotriz Palín"
+              className="brand-logo"
+            />
+          </div>
+
+          <div className="brand-text">
+            <h1>Centro Automotriz Palín</h1>
+            <h2>Calidad y precisión en cada reparación</h2>
+          </div>
+        </div>
       </div>
 
       <div className="cards">
@@ -517,22 +585,10 @@ function DashboardPage() {
         <h3 className="section-title">Estados del proceso</h3>
         <div className="states-grid">
           {estados.length > 0 ? (
-            estados.map((item, index) => (
+            estados.map((item) => (
               <button
-                key={index}
-                className={`state-card state-button ${
-                  item.estado_actual === "En enderezado"
-                    ? "state-enderezado"
-                    : item.estado_actual === "En preparación"
-                    ? "state-preparacion"
-                    : item.estado_actual === "En pintura"
-                    ? "state-pintura"
-                    : item.estado_actual === "En armado"
-                    ? "state-armado"
-                    : item.estado_actual === "En lavado"
-                    ? "state-lavado"
-                    : "state-default"
-                }`}
+                key={item.estado_actual}
+                className={`state-card state-button ${obtenerClaseEstado(item.estado_actual)}`}
                 onClick={() => seleccionarEstado(item.estado_actual)}
                 type="button"
               >
@@ -646,7 +702,7 @@ function DashboardPage() {
                   <tbody>
                     {entregasSemanales.length > 0 ? (
                       entregasSemanales.map((item, index) => (
-                        <tr key={index}>
+                        <tr key={`semana-${item.semana}-${index}`}>
                           <td>Semana {item.semana}</td>
                           <td>{item.total_entregas}</td>
                         </tr>
@@ -667,7 +723,7 @@ function DashboardPage() {
           <div className="alerts-grid">
             {alertasOperativas.length > 0 ? (
               alertasOperativas.map((alerta, index) => (
-                <div key={index} className={obtenerClaseAlerta(alerta.nivel)}>
+                <div key={`alerta-${alerta.tipo}-${alerta.referencia}-${index}`} className={obtenerClaseAlerta(alerta.nivel)}>
                   <div className="alert-top">
                     <span className="alert-badge">
                       {obtenerEtiquetaAlerta(alerta.nivel)}
@@ -743,8 +799,8 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {cargaTecnicos.length > 0 ? (
-                    cargaTecnicos.map((item, index) => (
-                      <tr key={index}>
+                    cargaTecnicos.map((item) => (
+                      <tr key={item.tecnico_asignado}>
                         <td>{item.tecnico_asignado}</td>
                         <td>{item.total_ordenes_activas}</td>
                         <td>{item.total_atrasadas}</td>
@@ -938,8 +994,8 @@ function DashboardPage() {
               </thead>
               <tbody>
                 {reprocesos.length > 0 ? (
-                  reprocesos.map((item, index) => (
-                    <tr key={index}>
+                  reprocesos.map((item) => (
+                    <tr key={item.id_recepcion}>
                       <td>{item.id_recepcion}</td>
                       <td>{item.placa}</td>
                       <td>{item.marca}</td>
@@ -982,7 +1038,7 @@ function DashboardPage() {
                     const tiempo = calcularTiempoEstado(item.fecha_limite_etapa);
 
                     return (
-                      <tr key={index}>
+                      <tr key={`atraso-${item.numero_orden}-${index}`}>
                         <td>{item.numero_orden}</td>
                         <td>{item.estado_proceso}</td>
                         <td>{formatearFechaHora(item.fecha_inicio)}</td>
@@ -1018,8 +1074,8 @@ function DashboardPage() {
               </thead>
               <tbody>
                 {repuestos.length > 0 ? (
-                  repuestos.map((item, index) => (
-                    <tr key={index}>
+                  repuestos.map((item) => (
+                    <tr key={item.numero_orden}>
                       <td>{item.numero_orden}</td>
                       <td>{item.tecnico_asignado}</td>
                       <td>{item.estado_actual}</td>
