@@ -72,7 +72,7 @@ function ClientesPage() {
   return (
     <div className="clientes-container">
       <div className="clientes-header">
-        <h1>Mini ERP Taller</h1>
+        <h1>Centro Automotriz Palín</h1>
         <h2>Registro de Clientes</h2>
       </div>
 

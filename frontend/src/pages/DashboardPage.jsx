@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 import "./DashboardPage.css";
 
@@ -19,8 +20,11 @@ function DashboardPage() {
   const [repuestos, setRepuestos] = useState([]);
   const [reprocesos, setReprocesos] = useState([]);
   const [entregasSemanales, setEntregasSemanales] = useState([]);
-  const [entregasMensuales, setEntregasMensuales] = useState([]);
-  const [vistaActiva, setVistaActiva] = useState("detalle");
+  const [resumenEntregas, setResumenEntregas] = useState(null);
+  const [entregasMensualesControl, setEntregasMensualesControl] = useState([]);
+  const [indicadoresOperativos, setIndicadoresOperativos] = useState(null);
+  const [promedioReparacion, setPromedioReparacion] = useState(null);
+  const [vistaActiva, setVistaActiva] = useState("inicio");
   const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,6 +63,41 @@ function DashboardPage() {
     return `${anio}-${mes}-${dia} ${horas}:${minutos}`;
   };
 
+  const calcularTiempoEstado = (fechaLimite) => {
+    if (!fechaLimite) {
+      return {
+        situacion: "Sin fecha límite",
+        detalleTiempo: "Sin fecha límite",
+      };
+    }
+
+    const ahora = new Date();
+    const limite = new Date(fechaLimite);
+    const diferenciaMs = limite.getTime() - ahora.getTime();
+    const esAtrasado = diferenciaMs < 0;
+    const valorAbsoluto = Math.abs(diferenciaMs);
+
+    const minutosTotales = Math.floor(valorAbsoluto / (1000 * 60));
+    const horasTotales = Math.floor(valorAbsoluto / (1000 * 60 * 60));
+    const diasTotales = Math.floor(valorAbsoluto / (1000 * 60 * 60 * 24));
+
+    let detalleFinal;
+
+    if (diasTotales >= 1) {
+      detalleFinal = `${diasTotales} ${diasTotales === 1 ? "día" : "días"}`;
+    } else if (horasTotales >= 1) {
+      detalleFinal = `${horasTotales} ${horasTotales === 1 ? "hora" : "horas"}`;
+    } else {
+      const minutos = Math.max(minutosTotales, 1);
+      detalleFinal = `${minutos} ${minutos === 1 ? "minuto" : "minutos"}`;
+    }
+
+    return {
+      situacion: esAtrasado ? "Atrasado" : "En tiempo",
+      detalleTiempo: detalleFinal,
+    };
+  };
+
   const obtenerClaseSituacion = (situacion) => {
     switch (situacion) {
       case "Atrasado":
@@ -85,7 +124,10 @@ function DashboardPage() {
           repuestosRes,
           reprocesosRes,
           semanalesRes,
-          mensualesRes,
+          resumenEntregasRes,
+          entregasMensualesControlRes,
+          indicadoresOperativosRes,
+          promedioReparacionRes,
         ] = await Promise.all([
           axios.get("http://localhost:4000/dashboard/resumen"),
           axios.get("http://localhost:4000/dashboard/estados"),
@@ -94,7 +136,10 @@ function DashboardPage() {
           axios.get("http://localhost:4000/dashboard/repuestos"),
           axios.get("http://localhost:4000/dashboard/reprocesos"),
           axios.get("http://localhost:4000/dashboard/entregas-semanales"),
-          axios.get("http://localhost:4000/dashboard/entregas-mensuales"),
+          axios.get("http://localhost:4000/dashboard/resumen-entregas"),
+          axios.get("http://localhost:4000/dashboard/entregas-mensuales-control"),
+          axios.get("http://localhost:4000/dashboard/indicadores-operativos"),
+          axios.get("http://localhost:4000/dashboard/promedio-reparacion"),
         ]);
 
         setResumen(resumenRes.data);
@@ -104,7 +149,10 @@ function DashboardPage() {
         setRepuestos(repuestosRes.data);
         setReprocesos(reprocesosRes.data);
         setEntregasSemanales(semanalesRes.data);
-        setEntregasMensuales(mensualesRes.data);
+        setResumenEntregas(resumenEntregasRes.data);
+        setEntregasMensualesControl(entregasMensualesControlRes.data);
+        setIndicadoresOperativos(indicadoresOperativosRes.data);
+        setPromedioReparacion(promedioReparacionRes.data);
       } catch (err) {
         console.error("Error al cargar dashboard:", err);
         setError("No se pudo cargar la información del dashboard");
@@ -117,7 +165,7 @@ function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || vistaActiva === "inicio") return;
 
     let destino = detalleRef.current;
 
@@ -203,11 +251,14 @@ function DashboardPage() {
   }, [vistaActiva, estadoSeleccionado]);
 
   const datosMensualesGrafica = useMemo(() => {
-    return entregasMensuales.map((item) => ({
+    return entregasMensualesControl.map((item) => ({
       mes: nombresMeses[item.mes] || `Mes ${item.mes}`,
-      entregas: Number(item.total_entregas),
+      aTiempo: Number(item.entregados_a_tiempo || 0),
+      conAtraso: Number(item.entregados_con_atraso || 0),
+      sinFecha: Number(item.entregados_sin_fecha_estimada || 0),
+      total: Number(item.total_entregas || 0),
     }));
-  }, [entregasMensuales]);
+  }, [entregasMensualesControl]);
 
   if (loading) {
     return <div className="loading">Cargando dashboard...</div>;
@@ -220,52 +271,60 @@ function DashboardPage() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Taller Automotriz</h1>
+        <h1>Centro Automotriz Palín</h1>
         <h2>Calidad y precisión en cada reparación</h2>
       </div>
 
       <div className="cards">
-        <button className="card card-button" onClick={() => cambiarVista("detalle")}>
+        <button className="card card-button card-total" onClick={() => cambiarVista("detalle")}>
           <h3>Total de órdenes</h3>
           <p>{resumen?.total_ordenes}</p>
+          <span className="card-subtext">Panorama general</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("proceso")}>
+        <button className="card card-button card-proceso" onClick={() => cambiarVista("proceso")}>
           <h3>Vehículos en proceso</h3>
           <p>{vehiculosEnProceso}</p>
+          <span className="card-subtext">Trabajo activo actual</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("listas")}>
+        <button className="card card-button card-listas" onClick={() => cambiarVista("listas")}>
           <h3>Listas para entrega</h3>
           <p>{resumen?.listas_para_entrega}</p>
+          <span className="card-subtext">Pendientes de salida</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("entregados")}>
+        <button className="card card-button card-entregados" onClick={() => cambiarVista("entregados")}>
           <h3>Vehículos entregados</h3>
           <p>{resumen?.total_entregados}</p>
+          <span className="card-subtext">Órdenes finalizadas</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("repuestos")}>
+        <button className="card card-button card-repuestos" onClick={() => cambiarVista("repuestos")}>
           <h3>Pendientes repuestos</h3>
           <p>{resumen?.pendientes_repuestos}</p>
+          <span className="card-subtext">Requieren atención</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("atrasados")}>
+        <button className="card card-button card-atrasos" onClick={() => cambiarVista("atrasados")}>
           <h3>Órdenes atrasadas</h3>
           <p>{atrasos.length}</p>
+          <span className="card-subtext">Fuera de tiempo</span>
         </button>
 
-        <button className="card card-button" onClick={() => cambiarVista("reprocesos")}>
+        <button className="card card-button card-reprocesos" onClick={() => cambiarVista("reprocesos")}>
           <h3>Total reprocesos</h3>
           <p>{resumen?.total_reprocesos}</p>
+          <span className="card-subtext">Casos reincidentes</span>
         </button>
 
         <button
-          className="card card-button"
+          className="card card-button card-resumen"
           onClick={() => cambiarVista("resumen-entregas")}
         >
-          <h3>Resumen de Entregas</h3>
+          <h3>Resumen de entregas</h3>
           <p>{resumen?.total_entregados}</p>
+          <span className="card-subtext">Cumplimiento y tendencia</span>
         </button>
       </div>
 
@@ -276,12 +335,37 @@ function DashboardPage() {
             estados.map((item, index) => (
               <button
                 key={index}
-                className="state-card state-button"
+                className={`state-card state-button ${
+                  item.estado_actual === "En enderezado"
+                    ? "state-enderezado"
+                    : item.estado_actual === "En preparación"
+                    ? "state-preparacion"
+                    : item.estado_actual === "En pintura"
+                    ? "state-pintura"
+                    : item.estado_actual === "En armado"
+                    ? "state-armado"
+                    : item.estado_actual === "En lavado"
+                    ? "state-lavado"
+                    : "state-default"
+                }`}
                 onClick={() => seleccionarEstado(item.estado_actual)}
                 type="button"
               >
-                <span className="state-label">{item.estado_actual}</span>
-                <span className="state-value">{item.total_vehiculos}</span>
+                <div className="state-top">
+                  <span className="state-label">{item.estado_actual}</span>
+                </div>
+
+                <div className="state-middle">
+                  <span className="state-value">{item.total_vehiculos}</span>
+                </div>
+
+                <div className="state-bottom">
+                  <span className="state-subtext">
+                    {Number(item.total_vehiculos) === 1
+                      ? "1 vehículo"
+                      : `${item.total_vehiculos} vehículos`}
+                  </span>
+                </div>
               </button>
             ))
           ) : (
@@ -293,17 +377,99 @@ function DashboardPage() {
       {vistaActiva === "resumen-entregas" && (
         <div className="section" ref={resumenEntregasRef}>
           <h3 className="section-title">Resumen de entregas</h3>
+
+          <div className="delivery-kpis-grid">
+            <div className="mini-kpi-card">
+              <span className="mini-kpi-label">Total entregados</span>
+              <span className="mini-kpi-value">
+                {resumenEntregas?.total_entregados ?? 0}
+              </span>
+            </div>
+
+            <div className="mini-kpi-card success-card">
+              <span className="mini-kpi-label">Entregados a tiempo</span>
+              <span className="mini-kpi-value">
+                {resumenEntregas?.entregados_a_tiempo ?? 0}
+              </span>
+            </div>
+
+            <div className="mini-kpi-card danger-card">
+              <span className="mini-kpi-label">Entregados con atraso</span>
+              <span className="mini-kpi-value">
+                {resumenEntregas?.entregados_con_atraso ?? 0}
+              </span>
+            </div>
+
+            <div className="mini-kpi-card warning-card">
+              <span className="mini-kpi-label">Cumplimiento</span>
+              <span className="mini-kpi-value">
+                {resumenEntregas?.porcentaje_cumplimiento ?? 0}%
+              </span>
+            </div>
+          </div>
+
+          <div className="operational-kpis-grid">
+            <div className="mini-kpi-card info-card">
+              <span className="mini-kpi-label">Área con mayor carga</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {indicadoresOperativos?.area_mayor_carga || "Sin datos"}
+              </span>
+              <span className="mini-kpi-subtext">
+                {indicadoresOperativos?.total_area_mayor_carga || 0} vehículos
+              </span>
+            </div>
+
+            <div className="mini-kpi-card danger-card">
+              <span className="mini-kpi-label">Área con más atrasos</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"}
+              </span>
+              <span className="mini-kpi-subtext">
+                {indicadoresOperativos?.total_area_mas_atrasada || 0} casos
+              </span>
+            </div>
+
+            <div className="mini-kpi-card info-card">
+              <span className="mini-kpi-label">Tiempo promedio de reparación</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {promedioReparacion?.promedio_general_dias ?? 0} días
+              </span>
+              <span className="mini-kpi-subtext">
+                {promedioReparacion?.total_ordenes_analizadas ?? 0} órdenes analizadas
+              </span>
+            </div>
+          </div>
+
           <div className="delivery-summary-grid">
             <div className="chart-card">
               <h4>Entregas mensuales</h4>
               <div className="chart-wrapper">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <BarChart data={datosMensualesGrafica}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="mes" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="entregas" radius={[8, 8, 0, 0]} />
+                    <Legend />
+                    <Bar
+                      dataKey="aTiempo"
+                      name="A tiempo"
+                      stackId="a"
+                      fill="#22c55e"
+                      radius={[6, 6, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="conAtraso"
+                      name="Con atraso"
+                      stackId="a"
+                      fill="#ef4444"
+                    />
+                    <Bar
+                      dataKey="sinFecha"
+                      name="Sin fecha estimada"
+                      stackId="a"
+                      fill="#f59e0b"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -356,32 +522,38 @@ function DashboardPage() {
                   <th>Técnico</th>
                   <th>Fecha límite</th>
                   <th>Situación</th>
+                  <th>Tiempo</th>
                 </tr>
               </thead>
               <tbody>
                 {detalleFiltrado.length > 0 ? (
-                  detalleFiltrado.map((item) => (
-                    <tr key={item.id_orden}>
-                      <td>{item.numero_orden}</td>
-                      <td>{item.estado_actual}</td>
-                      <td>
-                        {item.placa} - {item.marca} {item.modelo}
-                      </td>
-                      <td>
-                        {item.nombres} {item.apellidos}
-                      </td>
-                      <td>{item.tecnico_asignado || "Sin asignar"}</td>
-                      <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
-                      <td>
-                        <span className={obtenerClaseSituacion(item.situacion_tiempo)}>
-                          {item.situacion_tiempo}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  detalleFiltrado.map((item) => {
+                    const tiempo = calcularTiempoEstado(item.fecha_limite_etapa);
+
+                    return (
+                      <tr key={item.id_orden}>
+                        <td>{item.numero_orden}</td>
+                        <td>{item.estado_actual}</td>
+                        <td>
+                          {item.placa} - {item.marca} {item.modelo}
+                        </td>
+                        <td>
+                          {item.nombres} {item.apellidos}
+                        </td>
+                        <td>{item.tecnico_asignado || "Sin asignar"}</td>
+                        <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
+                        <td>
+                          <span className={obtenerClaseSituacion(item.situacion_tiempo)}>
+                            {item.situacion_tiempo}
+                          </span>
+                        </td>
+                        <td className="time-cell">{tiempo.detalleTiempo}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="7">No hay registros para esta vista.</td>
+                    <td colSpan="8">No hay registros para esta vista.</td>
                   </tr>
                 )}
               </tbody>
@@ -441,23 +613,29 @@ function DashboardPage() {
                   <th>Estado proceso</th>
                   <th>Fecha inicio</th>
                   <th>Fecha límite</th>
+                  <th>Tiempo atraso</th>
                   <th>Motivo atraso</th>
                 </tr>
               </thead>
               <tbody>
                 {atrasos.length > 0 ? (
-                  atrasos.map((item, index) => (
-                    <tr key={index}>
-                      <td>{item.numero_orden}</td>
-                      <td>{item.estado_proceso}</td>
-                      <td>{formatearFechaHora(item.fecha_inicio)}</td>
-                      <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
-                      <td>{item.motivo_atraso || "Sin motivo registrado"}</td>
-                    </tr>
-                  ))
+                  atrasos.map((item, index) => {
+                    const tiempo = calcularTiempoEstado(item.fecha_limite_etapa);
+
+                    return (
+                      <tr key={index}>
+                        <td>{item.numero_orden}</td>
+                        <td>{item.estado_proceso}</td>
+                        <td>{formatearFechaHora(item.fecha_inicio)}</td>
+                        <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
+                        <td className="time-cell">{tiempo.detalleTiempo}</td>
+                        <td>{item.motivo_atraso || "Sin motivo registrado"}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="5">No hay órdenes con atraso actualmente.</td>
+                    <td colSpan="6">No hay órdenes con atraso actualmente.</td>
                   </tr>
                 )}
               </tbody>

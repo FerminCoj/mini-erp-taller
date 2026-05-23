@@ -206,7 +206,7 @@ function OrdenesPage() {
   return (
     <div className="ordenes-container">
       <div className="ordenes-header">
-        <h1>Mini ERP Taller</h1>
+        <h1>Centro Automotriz Palín</h1>
         <h2>Órdenes de Trabajo</h2>
       </div>
 

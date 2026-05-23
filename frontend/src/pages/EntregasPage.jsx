@@ -94,7 +94,7 @@ function EntregasPage() {
   return (
     <div className="entregas-container">
       <div className="entregas-header">
-        <h1>Mini ERP Taller</h1>
+        <h1>Centro Automotriz Palín</h1>
         <h2>Entrega Final de Vehículos</h2>
       </div>
 

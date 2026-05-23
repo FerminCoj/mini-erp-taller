@@ -98,7 +98,7 @@ function RecepcionesPage() {
   return (
     <div className="recepciones-container">
       <div className="recepciones-header">
-        <h1>Mini ERP Taller</h1>
+        <h1>Centro Automotriz Palín</h1>
         <h2>Recepción de Vehículos</h2>
       </div>
 

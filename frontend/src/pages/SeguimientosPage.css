@@ -156,34 +156,6 @@ tbody tr:hover {
   margin-top: 16px;
 }
 
-@media (max-width: 768px) {
-  .seguimientos-container {
-    padding: 24px 14px 40px;
-  }
-
-  .seguimientos-header h1 {
-    font-size: 36px;
-  }
-
-  .seguimientos-header h2 {
-    font-size: 20px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .full-width {
-    grid-column: auto;
-  }
-
-  th,
-  td {
-    padding: 12px 10px;
-    font-size: 14px;
-  }
-}
-
 .info-text {
   margin-top: 16px;
   color: #475569;
@@ -205,4 +177,128 @@ tbody tr:hover {
   opacity: 1;
   filter: invert(18%) sepia(15%) saturate(1352%) hue-rotate(182deg)
     brightness(92%) contrast(92%);
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-box {
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+}
+
+.filter-box label {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.filter-box select {
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.current-status-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 6px solid #1e3a5f;
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.current-status-card p {
+  margin: 8px 0;
+  color: #334155;
+}
+
+.highlight-row {
+  background-color: #dbeafe !important;
+}
+
+@media (max-width: 768px) {
+  .seguimientos-container {
+    padding: 24px 14px 40px;
+  }
+
+  .seguimientos-header h1 {
+    font-size: 36px;
+  }
+
+  .seguimientos-header h2 {
+    font-size: 20px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .full-width {
+    grid-column: auto;
+  }
+
+  .filter-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-box {
+    min-width: 100%;
+  }
+
+  th,
+  td {
+    padding: 12px 10px;
+    font-size: 14px;
+  }
+}
+
+.current-status-card-form {
+  margin-top: 18px;
+}
+
+
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 115px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.status-success {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.status-danger {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.status-warning {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.time-cell {
+  min-width: 130px;
+  white-space: nowrap;
 }
