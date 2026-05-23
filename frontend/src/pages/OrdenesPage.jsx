@@ -113,10 +113,30 @@ function OrdenesPage() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    setFormData({
-      ...formData,
+    if (name === "id_recepcion") {
+      const recepcionSeleccionada = recepcionesDisponibles.find(
+        (recepcion) => Number(recepcion.id_recepcion) === Number(value)
+      );
+
+      const motivoIngreso =
+        recepcionSeleccionada?.motivo_ingreso ||
+        recepcionSeleccionada?.motivo ||
+        recepcionSeleccionada?.descripcion_ingreso ||
+        recepcionSeleccionada?.descripcion ||
+        "";
+
+      setFormData((prev) => ({
+        ...prev,
+        id_recepcion: value,
+        descripcion_trabajo: motivoIngreso,
+      }));
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
       [name]: type === "checkbox" ? checked : value,
-    });
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -257,6 +277,7 @@ function OrdenesPage() {
               name="descripcion_trabajo"
               value={formData.descripcion_trabajo}
               onChange={handleChange}
+              placeholder="Se cargará automáticamente según el motivo de ingreso"
             />
           </div>
 
@@ -296,17 +317,6 @@ function OrdenesPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label>Historial</label>
-            <button
-              type="button"
-              className="history-btn inline-history-btn"
-              onClick={irAListadoOrdenes}
-            >
-              Ver historial en listado
-            </button>
-          </div>
-
           <div className="form-group full-width">
             <label htmlFor="observacion_repuestos">Observación de repuestos</label>
             <input
@@ -340,6 +350,14 @@ function OrdenesPage() {
 
           <button type="submit" className="full-width">
             Registrar orden
+          </button>
+
+          <button
+            type="button"
+            className="history-btn full-width"
+            onClick={irAListadoOrdenes}
+          >
+            Ver historial en listado
           </button>
         </form>
 

@@ -495,6 +495,187 @@ const obtenerPromedioReparacionDashboard = async (req, res) => {
   }
 };
 
+const obtenerCargaTecnicosDashboard = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      WITH ultimo_seguimiento AS (
+        SELECT DISTINCT ON (sr.id_orden)
+          sr.id_orden,
+          sr.estado_proceso,
+          sr.fecha_limite_etapa
+        FROM seguimiento_reparacion sr
+        ORDER BY sr.id_orden, sr.id_seguimiento DESC
+      ),
+      ordenes_activas AS (
+        SELECT
+          ot.id_orden,
+          ot.numero_orden,
+          COALESCE(NULLIF(TRIM(ot.tecnico_asignado), ''), 'Sin asignar') AS tecnico_asignado,
+          COALESCE(us.estado_proceso, ot.estado_actual) AS estado_actual,
+          us.fecha_limite_etapa
+        FROM ordenes_trabajo ot
+        LEFT JOIN ultimo_seguimiento us ON ot.id_orden = us.id_orden
+        WHERE COALESCE(us.estado_proceso, ot.estado_actual) <> 'Entregado'
+      )
+      SELECT
+        tecnico_asignado,
+        COUNT(*) AS total_ordenes_activas,
+        COUNT(*) FILTER (
+          WHERE fecha_limite_etapa IS NOT NULL
+            AND CURRENT_TIMESTAMP > fecha_limite_etapa
+        ) AS total_atrasadas,
+        COUNT(*) FILTER (
+          WHERE estado_actual = 'Listo para entrega'
+        ) AS total_listas_entrega
+      FROM ordenes_activas
+      GROUP BY tecnico_asignado
+      ORDER BY COUNT(*) DESC, tecnico_asignado ASC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener carga por técnico:", error);
+    res.status(500).json({
+      mensaje: "Error al obtener carga por técnico",
+      error: error.message,
+    });
+  }
+};
+
+const obtenerAlertasOperativasDashboard = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      WITH ultimo_seguimiento AS (
+        SELECT DISTINCT ON (sr.id_orden)
+          sr.id_orden,
+          sr.estado_proceso,
+          sr.fecha_limite_etapa,
+          sr.motivo_atraso
+        FROM seguimiento_reparacion sr
+        ORDER BY sr.id_orden, sr.id_seguimiento DESC
+      ),
+      base_ordenes AS (
+        SELECT
+          ot.id_orden,
+          ot.numero_orden,
+          COALESCE(NULLIF(TRIM(ot.tecnico_asignado), ''), 'Sin asignar') AS tecnico_asignado,
+          COALESCE(us.estado_proceso, ot.estado_actual) AS estado_actual,
+          us.fecha_limite_etapa,
+          ot.requiere_repuestos,
+          ot.repuestos_completos,
+          ot.observacion_repuestos,
+          us.motivo_atraso,
+          CASE
+            WHEN us.fecha_limite_etapa IS NULL THEN NULL
+            ELSE FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - us.fecha_limite_etapa)) / 86400)
+          END AS dias_atraso
+        FROM ordenes_trabajo ot
+        LEFT JOIN ultimo_seguimiento us ON ot.id_orden = us.id_orden
+        WHERE COALESCE(us.estado_proceso, ot.estado_actual) <> 'Entregado'
+      ),
+      sobrecarga_tecnico AS (
+        SELECT
+          tecnico_asignado,
+          COUNT(*) AS total_ordenes
+        FROM base_ordenes
+        GROUP BY tecnico_asignado
+        HAVING COUNT(*) > 3
+      ),
+      alertas_ordenes AS (
+        SELECT
+          'critica' AS nivel,
+          'Atraso crítico' AS tipo,
+          numero_orden AS referencia,
+          CONCAT(
+            numero_orden,
+            ' lleva ',
+            COALESCE(dias_atraso, 0),
+            ' días de atraso'
+          ) AS mensaje,
+          1 AS prioridad
+        FROM base_ordenes
+        WHERE fecha_limite_etapa IS NOT NULL
+          AND CURRENT_TIMESTAMP > fecha_limite_etapa + INTERVAL '2 days'
+
+        UNION ALL
+
+        SELECT
+          'advertencia' AS nivel,
+          'Repuestos pendientes' AS tipo,
+          numero_orden AS referencia,
+          CONCAT(
+            numero_orden,
+            ' tiene repuestos pendientes',
+            CASE
+              WHEN COALESCE(observacion_repuestos, '') <> '' THEN CONCAT(': ', observacion_repuestos)
+              ELSE ''
+            END
+          ) AS mensaje,
+          2 AS prioridad
+        FROM base_ordenes
+        WHERE requiere_repuestos = TRUE
+          AND repuestos_completos = FALSE
+
+        UNION ALL
+
+        SELECT
+          'informativa' AS nivel,
+          'Sin fecha límite' AS tipo,
+          numero_orden AS referencia,
+          CONCAT(numero_orden, ' no tiene fecha límite asignada') AS mensaje,
+          3 AS prioridad
+        FROM base_ordenes
+        WHERE fecha_limite_etapa IS NULL
+
+        UNION ALL
+
+        SELECT
+          'informativa' AS nivel,
+          'Lista para entrega pendiente' AS tipo,
+          numero_orden AS referencia,
+          CONCAT(numero_orden, ' está lista para entrega y aún no se ha cerrado') AS mensaje,
+          3 AS prioridad
+        FROM base_ordenes
+        WHERE estado_actual = 'Listo para entrega'
+      ),
+      alertas_tecnicos AS (
+        SELECT
+          'advertencia' AS nivel,
+          'Sobrecarga por técnico' AS tipo,
+          tecnico_asignado AS referencia,
+          CONCAT(
+            tecnico_asignado,
+            ' tiene ',
+            total_ordenes,
+            ' órdenes activas'
+          ) AS mensaje,
+          2 AS prioridad
+        FROM sobrecarga_tecnico
+      )
+      SELECT
+        nivel,
+        tipo,
+        referencia,
+        mensaje
+      FROM (
+        SELECT * FROM alertas_ordenes
+        UNION ALL
+        SELECT * FROM alertas_tecnicos
+      ) alertas
+      ORDER BY prioridad ASC, tipo ASC, referencia ASC
+      LIMIT 20
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error al obtener alertas operativas:", error);
+    res.status(500).json({
+      mensaje: "Error al obtener alertas operativas",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   obtenerResumenDashboard,
   obtenerEstadosDashboard,
@@ -508,4 +689,6 @@ module.exports = {
   obtenerEntregasMensualesControl,
   obtenerIndicadoresOperativosDashboard,
   obtenerPromedioReparacionDashboard,
+  obtenerCargaTecnicosDashboard,
+  obtenerAlertasOperativasDashboard,
 };

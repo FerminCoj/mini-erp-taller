@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   BarChart,
   Bar,
@@ -24,12 +26,18 @@ function DashboardPage() {
   const [entregasMensualesControl, setEntregasMensualesControl] = useState([]);
   const [indicadoresOperativos, setIndicadoresOperativos] = useState(null);
   const [promedioReparacion, setPromedioReparacion] = useState(null);
+  const [cargaTecnicos, setCargaTecnicos] = useState([]);
+  const [alertasOperativas, setAlertasOperativas] = useState([]);
+  const [seguimientos, setSeguimientos] = useState([]);
+  const [entregas, setEntregas] = useState([]);
   const [vistaActiva, setVistaActiva] = useState("inicio");
   const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
+  const [ordenHistorialActiva, setOrdenHistorialActiva] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const detalleRef = useRef(null);
+  const historialRef = useRef(null);
   const reprocesosRef = useRef(null);
   const resumenEntregasRef = useRef(null);
   const atrasosRef = useRef(null);
@@ -52,8 +60,8 @@ function DashboardPage() {
 
   const formatearFechaHora = (fecha) => {
     if (!fecha) return "Sin fecha";
-
     const date = new Date(fecha);
+
     const anio = date.getFullYear();
     const mes = String(date.getMonth() + 1).padStart(2, "0");
     const dia = String(date.getDate()).padStart(2, "0");
@@ -113,6 +121,32 @@ function DashboardPage() {
     }
   };
 
+  const obtenerClaseAlerta = (nivel) => {
+    switch (nivel) {
+      case "critica":
+        return "alert-card alert-critical";
+      case "advertencia":
+        return "alert-card alert-warning";
+      case "informativa":
+        return "alert-card alert-info";
+      default:
+        return "alert-card";
+    }
+  };
+
+  const obtenerEtiquetaAlerta = (nivel) => {
+    switch (nivel) {
+      case "critica":
+        return "Crítica";
+      case "advertencia":
+        return "Advertencia";
+      case "informativa":
+        return "Informativa";
+      default:
+        return "Alerta";
+    }
+  };
+
   useEffect(() => {
     const cargarDashboard = async () => {
       try {
@@ -128,6 +162,10 @@ function DashboardPage() {
           entregasMensualesControlRes,
           indicadoresOperativosRes,
           promedioReparacionRes,
+          cargaTecnicosRes,
+          alertasOperativasRes,
+          seguimientosRes,
+          entregasRes,
         ] = await Promise.all([
           axios.get("http://localhost:4000/dashboard/resumen"),
           axios.get("http://localhost:4000/dashboard/estados"),
@@ -140,6 +178,10 @@ function DashboardPage() {
           axios.get("http://localhost:4000/dashboard/entregas-mensuales-control"),
           axios.get("http://localhost:4000/dashboard/indicadores-operativos"),
           axios.get("http://localhost:4000/dashboard/promedio-reparacion"),
+          axios.get("http://localhost:4000/dashboard/carga-tecnicos"),
+          axios.get("http://localhost:4000/dashboard/alertas-operativas"),
+          axios.get("http://localhost:4000/seguimientos"),
+          axios.get("http://localhost:4000/entregas"),
         ]);
 
         setResumen(resumenRes.data);
@@ -153,6 +195,10 @@ function DashboardPage() {
         setEntregasMensualesControl(entregasMensualesControlRes.data);
         setIndicadoresOperativos(indicadoresOperativosRes.data);
         setPromedioReparacion(promedioReparacionRes.data);
+        setCargaTecnicos(cargaTecnicosRes.data);
+        setAlertasOperativas(alertasOperativasRes.data);
+        setSeguimientos(seguimientosRes.data);
+        setEntregas(entregasRes.data);
       } catch (err) {
         console.error("Error al cargar dashboard:", err);
         setError("No se pudo cargar la información del dashboard");
@@ -181,14 +227,27 @@ function DashboardPage() {
     }
   }, [vistaActiva, estadoSeleccionado, loading]);
 
+  useEffect(() => {
+    if (ordenHistorialActiva && historialRef.current) {
+      setTimeout(() => {
+        historialRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 120);
+    }
+  }, [ordenHistorialActiva]);
+
   const cambiarVista = (vista) => {
     setVistaActiva(vista);
     setEstadoSeleccionado("");
+    setOrdenHistorialActiva(null);
   };
 
   const seleccionarEstado = (estado) => {
     setVistaActiva("estado-especifico");
     setEstadoSeleccionado(estado);
+    setOrdenHistorialActiva(null);
   };
 
   const vehiculosEnProceso = useMemo(() => {
@@ -199,35 +258,35 @@ function DashboardPage() {
     ).length;
   }, [detalleEstados]);
 
+  const tecnicoMayorCarga = useMemo(() => {
+    if (!cargaTecnicos.length) return null;
+    return cargaTecnicos[0];
+  }, [cargaTecnicos]);
+
   const detalleFiltrado = useMemo(() => {
     switch (vistaActiva) {
       case "detalle":
         return detalleEstados;
-
       case "proceso":
         return detalleEstados.filter(
           (item) =>
             item.estado_actual !== "Entregado" &&
             item.situacion_tiempo !== "Finalizado"
         );
-
       case "listas":
         return detalleEstados.filter(
           (item) => item.estado_actual === "Listo para entrega"
         );
-
       case "entregados":
         return detalleEstados.filter(
           (item) =>
             item.estado_actual === "Entregado" ||
             item.situacion_tiempo === "Finalizado"
         );
-
       case "estado-especifico":
         return detalleEstados.filter(
           (item) => item.estado_actual === estadoSeleccionado
         );
-
       default:
         return detalleEstados;
     }
@@ -250,6 +309,30 @@ function DashboardPage() {
     }
   }, [vistaActiva, estadoSeleccionado]);
 
+  const historialSeguimiento = useMemo(() => {
+    if (!ordenHistorialActiva) return [];
+    return seguimientos.filter(
+      (item) => Number(item.id_orden) === Number(ordenHistorialActiva.id_orden)
+    );
+  }, [seguimientos, ordenHistorialActiva]);
+
+  const historialEntrega = useMemo(() => {
+    if (!ordenHistorialActiva) return null;
+    return (
+      entregas.find(
+        (item) => Number(item.id_orden) === Number(ordenHistorialActiva.id_orden)
+      ) || null
+    );
+  }, [entregas, ordenHistorialActiva]);
+
+  const toggleHistorial = (orden) => {
+    if (ordenHistorialActiva?.id_orden === orden.id_orden) {
+      setOrdenHistorialActiva(null);
+    } else {
+      setOrdenHistorialActiva(orden);
+    }
+  };
+
   const datosMensualesGrafica = useMemo(() => {
     return entregasMensualesControl.map((item) => ({
       mes: nombresMeses[item.mes] || `Mes ${item.mes}`,
@@ -259,6 +342,108 @@ function DashboardPage() {
       total: Number(item.total_entregas || 0),
     }));
   }, [entregasMensualesControl]);
+
+  const exportarResumenPDF = () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const fechaGeneracion = new Date();
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("Centro Automotriz Palín", 14, 18);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text("Resumen gerencial del dashboard", 14, 25);
+    doc.text(
+      `Fecha de generación: ${fechaGeneracion.toLocaleDateString()} ${fechaGeneracion.toLocaleTimeString()}`,
+      14,
+      31
+    );
+
+    autoTable(doc, {
+      startY: 38,
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Total de órdenes", resumen?.total_ordenes ?? 0],
+        ["Vehículos en proceso", vehiculosEnProceso],
+        ["Listas para entrega", resumen?.listas_para_entrega ?? 0],
+        ["Vehículos entregados", resumen?.total_entregados ?? 0],
+        ["Pendientes repuestos", resumen?.pendientes_repuestos ?? 0],
+        ["Órdenes atrasadas", atrasos.length],
+        ["Total reprocesos", resumen?.total_reprocesos ?? 0],
+      ],
+      headStyles: { fillColor: [15, 23, 42] },
+      styles: { fontSize: 10 },
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [["Resumen de entregas", "Valor"]],
+      body: [
+        ["Total entregados", resumenEntregas?.total_entregados ?? 0],
+        ["Entregados a tiempo", resumenEntregas?.entregados_a_tiempo ?? 0],
+        ["Entregados con atraso", resumenEntregas?.entregados_con_atraso ?? 0],
+        ["Cumplimiento", `${resumenEntregas?.porcentaje_cumplimiento ?? 0}%`],
+      ],
+      headStyles: { fillColor: [30, 58, 95] },
+      styles: { fontSize: 10 },
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [["Análisis operativo", "Valor"]],
+      body: [
+        [
+          "Área con mayor carga",
+          `${indicadoresOperativos?.area_mayor_carga || "Sin datos"} (${indicadoresOperativos?.total_area_mayor_carga || 0})`,
+        ],
+        [
+          "Área con más atrasos",
+          `${indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"} (${indicadoresOperativos?.total_area_mas_atrasada || 0})`,
+        ],
+        [
+          "Tiempo promedio de reparación",
+          `${promedioReparacion?.promedio_general_dias ?? 0} días`,
+        ],
+        [
+          "Técnico con mayor carga",
+          `${tecnicoMayorCarga?.tecnico_asignado || "Sin datos"} (${tecnicoMayorCarga?.total_ordenes_activas || 0})`,
+        ],
+      ],
+      headStyles: { fillColor: [51, 65, 85] },
+      styles: { fontSize: 10 },
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [["Técnico", "Órdenes activas", "Atrasadas", "Listas para entrega"]],
+      body: cargaTecnicos.map((item) => [
+        item.tecnico_asignado,
+        item.total_ordenes_activas,
+        item.total_atrasadas,
+        item.total_listas_entrega,
+      ]),
+      headStyles: { fillColor: [15, 118, 110] },
+      styles: { fontSize: 10 },
+    });
+
+    if (alertasOperativas.length > 0) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [["Nivel", "Tipo", "Referencia", "Mensaje"]],
+        body: alertasOperativas.slice(0, 10).map((item) => [
+          obtenerEtiquetaAlerta(item.nivel),
+          item.tipo,
+          item.referencia,
+          item.mensaje,
+        ]),
+        headStyles: { fillColor: [220, 38, 38] },
+        styles: { fontSize: 9 },
+      });
+    }
+
+    doc.save("resumen-dashboard-centro-automotriz-palin.pdf");
+  };
 
   if (loading) {
     return <div className="loading">Cargando dashboard...</div>;
@@ -376,7 +561,12 @@ function DashboardPage() {
 
       {vistaActiva === "resumen-entregas" && (
         <div className="section" ref={resumenEntregasRef}>
-          <h3 className="section-title">Resumen de entregas</h3>
+          <div className="section-header-actions">
+            <h3 className="section-title no-margin">Resumen de entregas</h3>
+            <button className="export-pdf-btn" onClick={exportarResumenPDF}>
+              Exportar resumen PDF
+            </button>
+          </div>
 
           <div className="delivery-kpis-grid">
             <div className="mini-kpi-card">
@@ -404,38 +594,6 @@ function DashboardPage() {
               <span className="mini-kpi-label">Cumplimiento</span>
               <span className="mini-kpi-value">
                 {resumenEntregas?.porcentaje_cumplimiento ?? 0}%
-              </span>
-            </div>
-          </div>
-
-          <div className="operational-kpis-grid">
-            <div className="mini-kpi-card info-card">
-              <span className="mini-kpi-label">Área con mayor carga</span>
-              <span className="mini-kpi-value small-kpi-value">
-                {indicadoresOperativos?.area_mayor_carga || "Sin datos"}
-              </span>
-              <span className="mini-kpi-subtext">
-                {indicadoresOperativos?.total_area_mayor_carga || 0} vehículos
-              </span>
-            </div>
-
-            <div className="mini-kpi-card danger-card">
-              <span className="mini-kpi-label">Área con más atrasos</span>
-              <span className="mini-kpi-value small-kpi-value">
-                {indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"}
-              </span>
-              <span className="mini-kpi-subtext">
-                {indicadoresOperativos?.total_area_mas_atrasada || 0} casos
-              </span>
-            </div>
-
-            <div className="mini-kpi-card info-card">
-              <span className="mini-kpi-label">Tiempo promedio de reparación</span>
-              <span className="mini-kpi-value small-kpi-value">
-                {promedioReparacion?.promedio_general_dias ?? 0} días
-              </span>
-              <span className="mini-kpi-subtext">
-                {promedioReparacion?.total_ordenes_analizadas ?? 0} órdenes analizadas
               </span>
             </div>
           </div>
@@ -503,63 +661,264 @@ function DashboardPage() {
               </div>
             </div>
           </div>
+
+          <h4 className="subsection-title">Alertas operativas</h4>
+
+          <div className="alerts-grid">
+            {alertasOperativas.length > 0 ? (
+              alertasOperativas.map((alerta, index) => (
+                <div key={index} className={obtenerClaseAlerta(alerta.nivel)}>
+                  <div className="alert-top">
+                    <span className="alert-badge">
+                      {obtenerEtiquetaAlerta(alerta.nivel)}
+                    </span>
+                    <span className="alert-type">{alerta.tipo}</span>
+                  </div>
+                  <div className="alert-reference">{alerta.referencia}</div>
+                  <div className="alert-message">{alerta.mensaje}</div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-box">No hay alertas operativas en este momento.</div>
+            )}
+          </div>
+
+          <h4 className="subsection-title">Análisis operativo</h4>
+
+          <div className="operational-kpis-grid">
+            <div className="mini-kpi-card info-card">
+              <span className="mini-kpi-label">Área con mayor carga</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {indicadoresOperativos?.area_mayor_carga || "Sin datos"}
+              </span>
+              <span className="mini-kpi-subtext">
+                {indicadoresOperativos?.total_area_mayor_carga || 0} vehículos
+              </span>
+            </div>
+
+            <div className="mini-kpi-card danger-card">
+              <span className="mini-kpi-label">Área con más atrasos</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {indicadoresOperativos?.area_mas_atrasada || "Sin atrasos"}
+              </span>
+              <span className="mini-kpi-subtext">
+                {indicadoresOperativos?.total_area_mas_atrasada || 0} casos
+              </span>
+            </div>
+
+            <div className="mini-kpi-card info-card">
+              <span className="mini-kpi-label">Tiempo promedio de reparación</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {promedioReparacion?.promedio_general_dias ?? 0} días
+              </span>
+              <span className="mini-kpi-subtext">
+                {promedioReparacion?.total_ordenes_analizadas ?? 0} órdenes analizadas
+              </span>
+            </div>
+          </div>
+
+          <div className="operational-kpis-grid">
+            <div className="mini-kpi-card info-card">
+              <span className="mini-kpi-label">Técnico con mayor carga</span>
+              <span className="mini-kpi-value small-kpi-value">
+                {tecnicoMayorCarga?.tecnico_asignado || "Sin datos"}
+              </span>
+              <span className="mini-kpi-subtext">
+                {tecnicoMayorCarga?.total_ordenes_activas || 0} órdenes activas
+              </span>
+            </div>
+          </div>
+
+          <div className="section table-section-inside">
+            <h4 className="subsection-title">Carga de trabajo por técnico</h4>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Técnico</th>
+                    <th>Órdenes activas</th>
+                    <th>Atrasadas</th>
+                    <th>Listas para entrega</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cargaTecnicos.length > 0 ? (
+                    cargaTecnicos.map((item, index) => (
+                      <tr key={index}>
+                        <td>{item.tecnico_asignado}</td>
+                        <td>{item.total_ordenes_activas}</td>
+                        <td>{item.total_atrasadas}</td>
+                        <td>{item.total_listas_entrega}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4">No hay carga de trabajo registrada.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {["detalle", "proceso", "listas", "entregados", "estado-especifico"].includes(
         vistaActiva
       ) && (
-        <div className="section" ref={detalleRef}>
-          <h3 className="section-title">{tituloTablaPrincipal}</h3>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>No. Orden</th>
-                  <th>Estado actual</th>
-                  <th>Vehículo</th>
-                  <th>Cliente</th>
-                  <th>Técnico</th>
-                  <th>Fecha límite</th>
-                  <th>Situación</th>
-                  <th>Tiempo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detalleFiltrado.length > 0 ? (
-                  detalleFiltrado.map((item) => {
-                    const tiempo = calcularTiempoEstado(item.fecha_limite_etapa);
-
-                    return (
-                      <tr key={item.id_orden}>
-                        <td>{item.numero_orden}</td>
-                        <td>{item.estado_actual}</td>
-                        <td>
-                          {item.placa} - {item.marca} {item.modelo}
-                        </td>
-                        <td>
-                          {item.nombres} {item.apellidos}
-                        </td>
-                        <td>{item.tecnico_asignado || "Sin asignar"}</td>
-                        <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
-                        <td>
-                          <span className={obtenerClaseSituacion(item.situacion_tiempo)}>
-                            {item.situacion_tiempo}
-                          </span>
-                        </td>
-                        <td className="time-cell">{tiempo.detalleTiempo}</td>
-                      </tr>
-                    );
-                  })
-                ) : (
+        <>
+          <div className="section" ref={detalleRef}>
+            <h3 className="section-title">{tituloTablaPrincipal}</h3>
+            <div className="table-container">
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan="8">No hay registros para esta vista.</td>
+                    <th>No. Orden</th>
+                    <th>Estado actual</th>
+                    <th>Vehículo</th>
+                    <th>Cliente</th>
+                    <th>Técnico</th>
+                    <th>Fecha límite</th>
+                    <th>Situación</th>
+                    <th>Tiempo</th>
+                    <th>Acciones</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {detalleFiltrado.length > 0 ? (
+                    detalleFiltrado.map((item) => {
+                      const tiempo = calcularTiempoEstado(item.fecha_limite_etapa);
+
+                      return (
+                        <tr key={item.id_orden}>
+                          <td>{item.numero_orden}</td>
+                          <td>{item.estado_actual}</td>
+                          <td>
+                            {item.placa} - {item.marca} {item.modelo}
+                          </td>
+                          <td>
+                            {item.nombres} {item.apellidos}
+                          </td>
+                          <td>{item.tecnico_asignado || "Sin asignar"}</td>
+                          <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
+                          <td>
+                            <span className={obtenerClaseSituacion(item.situacion_tiempo)}>
+                              {item.situacion_tiempo}
+                            </span>
+                          </td>
+                          <td className="time-cell">{tiempo.detalleTiempo}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="history-btn"
+                              onClick={() => toggleHistorial(item)}
+                            >
+                              {ordenHistorialActiva?.id_orden === item.id_orden
+                                ? "Ocultar"
+                                : "Ver historial"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="9">No hay registros para esta vista.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {ordenHistorialActiva && (
+            <div className="section history-section" ref={historialRef}>
+              <h3 className="section-title">
+                Historial de la orden {ordenHistorialActiva.numero_orden}
+              </h3>
+
+              <div className="history-card">
+                <p>
+                  <strong>Cliente:</strong> {ordenHistorialActiva.nombres}{" "}
+                  {ordenHistorialActiva.apellidos}
+                </p>
+                <p>
+                  <strong>Vehículo:</strong> {ordenHistorialActiva.placa} -{" "}
+                  {ordenHistorialActiva.marca} {ordenHistorialActiva.modelo}
+                </p>
+                <p>
+                  <strong>Técnico:</strong> {ordenHistorialActiva.tecnico_asignado || "Sin asignar"}
+                </p>
+                <p>
+                  <strong>Estado actual:</strong> {ordenHistorialActiva.estado_actual}
+                </p>
+                <p>
+                  <strong>Descripción:</strong>{" "}
+                  {ordenHistorialActiva.descripcion_trabajo || "Sin descripción registrada"}
+                </p>
+              </div>
+
+              <div className="history-block">
+                <h4>Seguimiento registrado</h4>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                        <th>Fecha inicio</th>
+                        <th>Fecha fin</th>
+                        <th>Fecha límite</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historialSeguimiento.length > 0 ? (
+                        historialSeguimiento.map((item) => (
+                          <tr key={item.id_seguimiento}>
+                            <td>{item.id_seguimiento}</td>
+                            <td>{item.estado_proceso}</td>
+                            <td>{formatearFechaHora(item.fecha_inicio)}</td>
+                            <td>{formatearFechaHora(item.fecha_fin)}</td>
+                            <td>{formatearFechaHora(item.fecha_limite_etapa)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5">No hay seguimiento registrado para esta orden.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="history-block">
+                <h4>Entrega final</h4>
+                {historialEntrega ? (
+                  <div className="history-card">
+                    <p>
+                      <strong>Fecha entrega:</strong> {historialEntrega.fecha_entrega}
+                    </p>
+                    <p>
+                      <strong>Hora entrega:</strong> {historialEntrega.hora_entrega}
+                    </p>
+                    <p>
+                      <strong>Recibido por:</strong> {historialEntrega.recibido_por_cliente}
+                    </p>
+                    <p>
+                      <strong>Observaciones:</strong>{" "}
+                      {historialEntrega.observaciones_entrega || "Sin observaciones"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="history-card">
+                    <p>No hay entrega registrada para esta orden.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {vistaActiva === "reprocesos" && (

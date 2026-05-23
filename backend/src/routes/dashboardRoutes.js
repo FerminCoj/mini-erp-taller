@@ -14,6 +14,8 @@ const {
   obtenerEntregasMensualesControl,
   obtenerIndicadoresOperativosDashboard,
   obtenerPromedioReparacionDashboard,
+  obtenerCargaTecnicosDashboard,
+  obtenerAlertasOperativasDashboard,
 } = require("../controllers/dashboardController");
 
 router.get("/resumen", obtenerResumenDashboard);
@@ -28,5 +30,7 @@ router.get("/resumen-entregas", obtenerResumenEntregasDashboard);
 router.get("/entregas-mensuales-control", obtenerEntregasMensualesControl);
 router.get("/indicadores-operativos", obtenerIndicadoresOperativosDashboard);
 router.get("/promedio-reparacion", obtenerPromedioReparacionDashboard);
+router.get("/carga-tecnicos", obtenerCargaTecnicosDashboard);
+router.get("/alertas-operativas", obtenerAlertasOperativasDashboard);
 
 module.exports = router;
